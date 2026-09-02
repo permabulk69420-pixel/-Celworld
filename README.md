@@ -1,5 +1,7 @@
 # Celworld
 
+[Open Celworld in your Quest browser](https://permabulk69420-pixel.github.io/-Celworld/)
+
 A small, sunlit, Ghibli-inspired world built in Three.js for Meta Quest 3. The first valley is a place to wander: thick moving grass, wildflowers, spreading trees, a winding stream, a wooden bridge, and a little clay-roofed cottage.
 
 ![The first valley](docs/valley.jpg)
