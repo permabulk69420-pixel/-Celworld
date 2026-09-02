@@ -12,6 +12,18 @@ export const GARDEN_BEDS = [[19.35,-3.55],[24.65,-3.55],[19.35,-7.0],[24.65,-7.0
 export const GARDEN_PATH = [[8,19],[12,11],[17,5],[22,2.5],[22,-11],[21,-12]];
 export const CLEARING = { x: -60, z: 12, y: 1.88, radius: 3.85 };
 export const CLEARING_PATH = [[-49,12],[-53,12],[-56.65,12]];
+export const HIGHLAND = { x: 30, z: -70, y: 3.15, radiusX: 18, radiusZ: 14 };
+export const WINDMILL = { x: 39, z: -68, rotation: 2.46 };
+export const HIGHLAND_PATH = [
+  [27,-45],[29,-49],[30,-53],[31,-57],[31,-61],[26,-65],[23,-71],
+  [26,-77],[32,-79],[39,-78],[45,-72],[45,-65],[39,-61],[34,-61],[31,-57],
+];
+export const WINDMILL_PATH = [[34,-61],[36,-63],[36.6,-65.8]];
+export const ORCHARD_TREES = [
+  [19.5,-65,.72],[19.3,-71,.82],[21,-77,.7],[28.5,-66.6,.76],
+  [25.3,-73,.86],[27.4,-78.4,.7],[31.5,-69.5,.8],[32.2,-75,.72],
+  [38,-61.8,.78],[44.7,-63.5,.7],[46.8,-69,.82],[43.7,-75.3,.77],
+];
 export const BRIDGE = { x: riverX(4), z: 4, halfLength: 5.7, halfWidth: 1.24 };
 export const SPAWN = { x: 9.5, z: 22 };
 export function riverX(z) { return -8 + Math.sin(z * .047 + .15) * 8 + Math.sin(z * .019) * 2; }
@@ -33,7 +45,7 @@ export function woodlandAmount(x, z) {
 }
 export function pathDistance(x, z) {
   let d = Infinity;
-  for (const line of [path, cottagePath, WOODLAND_PATH, landingPath, GARDEN_PATH, CLEARING_PATH]) {
+  for (const line of [path, cottagePath, WOODLAND_PATH, landingPath, GARDEN_PATH, CLEARING_PATH, HIGHLAND_PATH, WINDMILL_PATH]) {
     for (let i = 1; i < line.length; i++) d = Math.min(d, segmentDistance(x, z, ...line[i - 1], ...line[i]));
   }
   d = Math.min(d, Math.abs(Math.hypot(x-CLEARING.x,z-CLEARING.z)-2.85));
@@ -44,6 +56,10 @@ export function inGarden(x,z,margin=0) {
 }
 export function inClearing(x,z,margin=0) {
   return Math.hypot(x-CLEARING.x,z-CLEARING.z)<CLEARING.radius+margin;
+}
+export function highlandAmount(x,z) {
+  const distance=Math.hypot((x-HIGHLAND.x)/HIGHLAND.radiusX,(z-HIGHLAND.z)/HIGHLAND.radiusZ);
+  return 1-smoothstep(.68,1.18,distance);
 }
 export function bridgeHeight(x, z) {
   const dx = Math.abs(x - BRIDGE.x);
@@ -74,6 +90,13 @@ function terrainProfile(x, z) {
   h = lerp(h,GARDEN.y,1-smoothstep(.9,1.65,garden));
   const glade = Math.hypot(x-CLEARING.x,z-CLEARING.z);
   h = lerp(h,CLEARING.y,1-smoothstep(CLEARING.radius,CLEARING.radius+2.7,glade));
+  // A broad ridge hides the orchard floor from the lower meadow. Its path rises
+  // gently over the crest before the terrain settles into the sheltered basin.
+  const ridge=Math.exp(-(((z+54)/5.5)**2))*(1-smoothstep(17,43,Math.abs(x-HIGHLAND.x)));
+  h+=ridge*2.55;
+  const basin=Math.hypot((x-HIGHLAND.x)/HIGHLAND.radiusX,(z-HIGHLAND.z)/HIGHLAND.radiusZ);
+  const basinFloor=HIGHLAND.y+(fbm(x*.09+120,z*.09-70)-.5)*.24;
+  h=lerp(h,basinFloor,1-smoothstep(.72,1.12,basin));
   return h;
 }
 
@@ -148,5 +171,6 @@ export function reserved(x, z, margin = 0) {
   if (riverDistance(x, z) < riverWidth(z) + margin) return true;
   if (pathDistance(x, z) < 1.2 + margin) return true;
   if (Math.abs(x - COTTAGE.x) < 5.1 + margin && Math.abs(z - COTTAGE.z) < 4.8 + margin) return true;
+  if (Math.hypot(x-WINDMILL.x,z-WINDMILL.z)<2.9+Math.max(0,margin))return true;
   return false;
 }

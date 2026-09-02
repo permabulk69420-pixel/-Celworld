@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { random, TAU, noise, smoothstep } from './math.js';
-import { terrainHeight, reserved, pathDistance, riverDistance, riverWidth, COTTAGE, woodlandAmount, WILLOW } from './land.js';
+import { terrainHeight, reserved, pathDistance, riverDistance, riverWidth, COTTAGE, woodlandAmount, highlandAmount, WILLOW } from './land.js';
 import { paintedMaterial, grassMaterial } from './materials.js';
 import { Sculpture, instances } from './geometry.js';
 
@@ -120,8 +120,9 @@ export function makeGrass(scene, trees) {
   geometry.setIndex([0,1,2, 1,3,2, 2,3,4]);
   const patches = [];
   let count = 0;
-  const c = new THREE.Color(), base = new THREE.Color('#7c9d3a'), light = new THREE.Color('#9aaf4c'), forestGreen=new THREE.Color('#657e49');
-  for (let gz = -6; gz <= 6; gz++) for (let gx = -6; gx <= 6; gx++) {
+  const c = new THREE.Color(), base = new THREE.Color('#7c9d3a'), light = new THREE.Color('#9aaf4c');
+  const forestGreen=new THREE.Color('#657e49'),highlandGreen=new THREE.Color('#98a64f');
+  for (let gz = -7; gz <= 6; gz++) for (let gx = -6; gx <= 6; gx++) {
     const cx = gx * 12, cz = gz * 12;
     if (Math.hypot(cx, cz) > 90) continue;
     const offsets = [], blades = [], tints = [];
@@ -132,11 +133,13 @@ export function makeGrass(scene, trees) {
       if (trees.some(t => Math.hypot(x - t.x, z - t.z) < .6 * t.s)) continue;
       const field = noise(x * .115 + 10, z * .115 + 30);
       const forest = woodlandAmount(x,z);
-      const height = (.24 + rng() * .51) * (.67 + field * .7) * (1-forest*.2);
+      const highland=highlandAmount(x,z);
+      const height = (.24 + rng() * .51) * (.67 + field * .7) * (1-forest*.2) * (1+highland*.12);
       offsets.push(x, terrainHeight(x, z) - .022, z);
       blades.push(rng() * TAU, height, .062 + rng() * .085, (rng() - .5) * .16);
       c.copy(base).lerp(light, field * .75 + rng() * .2);
       c.lerp(forestGreen,forest*.35);
+      c.lerp(highlandGreen,highland*.35);
       c.multiplyScalar(.83 + rng() * .25);
       for (const tree of trees) {
         const d = Math.hypot((x - tree.x - tree.s * 1.8) / (tree.s * 3.9), (z - tree.z + tree.s * 1.4) / (tree.s * 3.2));

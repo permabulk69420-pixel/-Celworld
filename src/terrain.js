@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { terrainHeight, pathDistance, WATER_Y, TERRAIN_SIZE, woodlandAmount, GARDEN, GARDEN_BEDS, CLEARING } from './land.js';
+import { terrainHeight, pathDistance, WATER_Y, TERRAIN_SIZE, woodlandAmount, highlandAmount, GARDEN, GARDEN_BEDS, CLEARING } from './land.js';
 import { fbm, noise, lerp, smoothstep, TAU } from './math.js';
 import { paintedMaterial, waterMaterial } from './materials.js';
 
@@ -12,6 +12,7 @@ export function makeTerrain(scene, trees) {
   const dark = new THREE.Color('#56845b'), earth = new THREE.Color('#c2ae7e');
   const bank = new THREE.Color('#9da47b'), wetEarth = new THREE.Color('#657d62');
   const woodland = new THREE.Color('#83926b');
+  const highland = new THREE.Color('#9ba45c');
   const c = new THREE.Color();
   for (let i = 0; i < position.count; i++) {
     const x = position.getX(i), z = position.getZ(i), h = terrainHeight(x, z);
@@ -20,6 +21,7 @@ export function makeTerrain(scene, trees) {
     c.copy(green).lerp(patch > .48 ? light : dark, Math.abs(patch - .48) * 2.7);
     c.multiplyScalar(.96 + .09 * noise(x * .7, z * .7));
     c.lerp(woodland,woodlandAmount(x,z)*.64);
+    c.lerp(highland,highlandAmount(x,z)*.38);
     const garden = Math.max(Math.abs(x-GARDEN.x)/GARDEN.halfX,Math.abs(z-GARDEN.z)/GARDEN.halfZ);
     c.lerp(earth,(1-smoothstep(.9,1.2,garden))*.8);
     const glade = Math.hypot(x-CLEARING.x,z-CLEARING.z);

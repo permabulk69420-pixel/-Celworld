@@ -2,17 +2,25 @@ import fs from 'node:fs';
 import * as THREE from 'three';
 import { createWorld } from '../src/world.js';
 import { time, eye, sun } from '../src/materials.js';
-import { terrainHeight, SPAWN, COTTAGE, cottageWorld, LANDING, GARDEN, CLEARING, BRIDGE } from '../src/land.js';
+import { terrainHeight, SPAWN, COTTAGE, cottageWorld, LANDING, GARDEN, CLEARING, BRIDGE, HIGHLAND, WINDMILL } from '../src/land.js';
 
 // CPU visual QA for the source scene when the provided browser has no WebGL.
 // This reads the actual geometry, instances and material uniforms. It is not a headset capture.
 const W=1440,H=960;
 const view=process.argv[2]||'overview';
-const views=['overview','interior','willow','woodland','landing','ground','river','bank','cottage','garden','arbour','clearing','well','bridge'];
+const views=['overview','interior','willow','woodland','landing','ground','river','bank','cottage','garden','arbour','clearing','well','bridge','ridge','highland','orchard','windmill'];
 if(!views.includes(view))throw new Error('Choose a view: '+views.join(', '));
 const world=createWorld();
 const camera=new THREE.PerspectiveCamera(58,W/H,.06,900);
-if(view==='garden'){
+if(view==='ridge'){
+  camera.position.set(29,terrainHeight(29,-49.5)+1.7,-49.5);camera.lookAt(36,HIGHLAND.y+5.4,-68);
+}else if(view==='highland'){
+  camera.position.set(31,terrainHeight(31,-59)+1.7,-59);camera.lookAt(35.5,HIGHLAND.y+2.8,-70.5);
+}else if(view==='orchard'){
+  camera.position.set(23.5,9.4,-57);camera.lookAt(34.5,HIGHLAND.y+2.1,-70.5);
+}else if(view==='windmill'){
+  camera.position.set(34.2,terrainHeight(34.2,-63)+1.7,-63);camera.lookAt(WINDMILL.x,HIGHLAND.y+5.0,WINDMILL.z);
+}else if(view==='garden'){
   camera.position.set(31,7.5,7);camera.lookAt(GARDEN.x,3.55,-4.5);
 }else if(view==='arbour'){
   camera.position.set(GARDEN.x,GARDEN.y+1.7,3.8);camera.lookAt(GARDEN.x,GARDEN.y+1.6,-6.8);
@@ -47,6 +55,7 @@ if(view==='garden'){
 camera.updateMatrixWorld(true);
 time.value=17;eye.value.copy(camera.position);world.animateLife(17);
 for(const p of world.grass.patches)p.mesh.visible=Math.hypot(p.x-camera.position.x,p.z-camera.position.z)<73;
+for(const detail of world.details||[])detail.root.visible=Math.hypot(detail.x-camera.position.x,detail.z-camera.position.z)<detail.distance;
 world.scene.updateMatrixWorld(true);
 const pixels=new Uint8Array(W*H*3),depth=new Float32Array(W*H).fill(Infinity);
 const colorBuffer=new Float32Array(W*H*3);
@@ -71,8 +80,12 @@ for(let y=0;y<H;y++)for(let x=0;x<W;x++){
 }
 let triangles=0,draws=0;
 const objects=[];
+const hierarchyVisible=object=>{
+  for(let current=object;current;current=current.parent)if(!current.visible)return false;
+  return true;
+};
 world.scene.traverse(o=>{
-  if(!o.isMesh||!o.visible||!o.material.isShaderMaterial||o.name==='A wide summer sky')return;
+  if(!o.isMesh||!hierarchyVisible(o)||!o.material.isShaderMaterial||o.name==='A wide summer sky')return;
   if(o.frustumCulled&&!frustum.intersectsObject(o))return;
   objects.push(o);
 });

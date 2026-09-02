@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { createWorld } from '../src/world.js';
 import { Walker, resolveCollision } from '../src/locomotion.js';
-import { COTTAGE, COTTAGE_FLOOR, cottageLocal, cottageWorld, groundHeight, LANDING, WOODLAND_PATH, GARDEN, GARDEN_PATH, CLEARING, CLEARING_PATH } from '../src/land.js';
+import { COTTAGE, COTTAGE_FLOOR, cottageLocal, cottageWorld, groundHeight, terrainHeight, LANDING, WOODLAND_PATH, GARDEN, GARDEN_PATH, CLEARING, CLEARING_PATH, HIGHLAND, HIGHLAND_PATH, WINDMILL, WINDMILL_PATH, ORCHARD_TREES } from '../src/land.js';
 
 const world=createWorld();
 world.scene.updateMatrixWorld(true);
@@ -104,4 +104,65 @@ test('the well has an accessible approach and a complete walking loop around its
     assert.ok(hits.length&&hits[0].distance<=water.geometry.parameters.radius,
       'stone walls meet the water at every angle, including between the blocks');
   }
+});
+
+test('the ridge climb, orchard loop and windmill spur remain clear through their scenery',()=>{
+  clearRoute(HIGHLAND_PATH);
+  clearRoute(WINDMILL_PATH);
+});
+
+test('a player can climb over the ridge and walk the complete orchard circuit',()=>{
+  const walker=new Walker(HIGHLAND_PATH[0][0],HIGHLAND_PATH[0][1],world.colliders);
+  for(let i=1;i<HIGHLAND_PATH.length;i++){
+    const target=HIGHLAND_PATH[i];
+    for(let frame=0;frame<900&&Math.hypot(walker.x-target[0],walker.z-target[1])>.19;frame++){
+      const dx=target[0]-walker.x,dz=target[1]-walker.z,length=Math.hypot(dx,dz);
+      walker.step(1/72,{...input,run:true},{x:dx/length,z:dz/length});
+    }
+    assert.ok(Math.hypot(walker.x-target[0],walker.z-target[1])<.2,`reach orchard waypoint ${i}`);
+    assert.ok(Math.abs(walker.y-groundHeight(walker.x,walker.z))<.025,'feet follow the shared terrain surface');
+  }
+});
+
+test('the ridge creates a smooth climb and conceals the basin until the crest',()=>{
+  let largestStep=0;
+  for(let i=1;i<5;i++){
+    const [ax,az]=HIGHLAND_PATH[i-1],[bx,bz]=HIGHLAND_PATH[i];
+    const count=Math.ceil(Math.hypot(bx-ax,bz-az)*16);
+    let previous=terrainHeight(ax,az);
+    for(let j=1;j<=count;j++){
+      const height=terrainHeight(ax+(bx-ax)*j/count,az+(bz-az)*j/count);
+      largestStep=Math.max(largestStep,Math.abs(height-previous));previous=height;
+    }
+  }
+  const start=terrainHeight(...HIGHLAND_PATH[0]);
+  const crest=Math.max(...HIGHLAND_PATH.slice(0,4).map(point=>terrainHeight(...point)));
+  const basin=terrainHeight(HIGHLAND.x,HIGHLAND.z);
+  assert.ok(largestStep<.045,'the climb has no locomotion-sized ledges');
+  assert.ok(crest>start+2.5,'the route visibly climbs away from the cottage meadow');
+  assert.ok(crest>basin+.5,'the crest stands above and screens the orchard floor');
+});
+
+test('the windmill turns above standing head height and keeps a solid tower footprint',()=>{
+  const rotor=world.scene.getObjectByName('Turning windmill rotor');
+  const sails=world.scene.getObjectByName('Windmill sails and wooden lattice');
+  assert.ok(rotor&&sails,'the windmill rotor is part of the live source scene');
+  world.animateLife(0);const before=rotor.rotation.z;
+  world.animateLife(3);world.scene.updateMatrixWorld(true);
+  assert.ok(rotor.rotation.z>before+.25,'the sails turn gently over time');
+  const position=sails.geometry.attributes.position,vertex=new THREE.Vector3();
+  let lowest=Infinity;
+  for(let i=0;i<position.count;i++)lowest=Math.min(lowest,vertex.fromBufferAttribute(position,i).applyMatrix4(sails.matrixWorld).y);
+  assert.ok(lowest>terrainHeight(WINDMILL.x,WINDMILL.z)+2.35,'turning sails clear a standing visitor');
+  const pushed=resolveCollision(WINDMILL.x,WINDMILL.z,world.colliders);
+  assert.ok(Math.hypot(pushed.x-WINDMILL.x,pushed.z-WINDMILL.z)>2.45,'the tower cannot be walked through');
+});
+
+test('the hidden basin carries a complete, distance-cullable orchard composition',()=>{
+  const orchard=world.scene.getObjectByName('The hidden orchard basin');
+  const fruit=world.scene.getObjectByName('Red and golden orchard fruit');
+  const wall=world.scene.getObjectByName('Old dry-stone orchard wall');
+  assert.ok(orchard&&fruit&&wall,'orchard trees, harvest and boundary are all present');
+  assert.ok(fruit.count>=ORCHARD_TREES.length*10,'fruit is distributed throughout the orchard rather than used as a token prop');
+  assert.ok(world.details.some(detail=>detail.root===orchard&&detail.distance>=80),'dense basin scenery can be culled from the lower valley');
 });

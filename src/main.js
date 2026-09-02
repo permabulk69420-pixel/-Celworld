@@ -40,7 +40,7 @@ async function start(){
     shaderFailed=true;
     fail('The valley could not finish rendering. Please reload the page.',new Error([gl.getProgramInfoLog(program),gl.getShaderInfoLog(vertex),gl.getShaderInfoLog(fragment)].join('\n')));
   };
-  const {scene,colliders,grass,flowerCount,animateLife}=createWorld();
+  const {scene,colliders,grass,flowerCount,details=[],animateLife}=createWorld();
   const soundButton=document.querySelector('#sound-toggle');
   let soundEnabled=true;
   const ambience=createAmbience(()=>{soundButton.disabled=true;soundButton.textContent='Ambience unavailable';});
@@ -176,6 +176,7 @@ async function start(){
       camera.getWorldPosition(eye.value);
     }
     for(const patch of grass.patches)patch.mesh.visible=Math.hypot(patch.x-eye.value.x,patch.z-eye.value.z)<73;
+    for(const detail of details)detail.root.visible=Math.hypot(detail.x-eye.value.x,detail.z-eye.value.z)<detail.distance;
     animateLife(elapsed);
     if(renderer.xr.isPresenting)soundRotation.copy(headRotation);else camera.getWorldQuaternion(soundRotation);
     soundForward.set(0,0,-1).applyQuaternion(soundRotation);soundUp.set(0,1,0).applyQuaternion(soundRotation);
@@ -184,7 +185,7 @@ async function start(){
     frameCounter++;
     if(diagnostic&&frameCounter%30===0){
       diagnostic.textContent=[
-        'CELWORLD 0.4 · '+(renderer.xr.isPresenting?'VR':'PREVIEW'),
+        'CELWORLD 0.5 · '+(renderer.xr.isPresenting?'VR':'PREVIEW'),
         'draw calls: '+renderer.info.render.calls,
         'triangles: '+renderer.info.render.triangles.toLocaleString(),
         'grass blades: '+grass.count.toLocaleString(),
