@@ -7,6 +7,11 @@ export const COTTAGE = { x: 16, z: -19, y: 2.55, rotation: -.12 };
 export const COTTAGE_FLOOR = .324;
 export const LANDING = { x: -2.85, z: 26, y: 1.24, halfX: 1.85, halfZ: 1.65, approachX: -8.1, approachHalfWidth: .83 };
 export const WILLOW = { x: -9.2, z: 23, s: 1.12 };
+export const GARDEN = { x: 22, z: -4.5, y: 1.84, halfX: 4.2, halfZ: 5.0 };
+export const GARDEN_BEDS = [[19.35,-3.55],[24.65,-3.55],[19.35,-7.0],[24.65,-7.0]];
+export const GARDEN_PATH = [[8,19],[12,11],[17,5],[22,2.5],[22,-11],[21,-12]];
+export const CLEARING = { x: -60, z: 12, y: 1.88, radius: 3.85 };
+export const CLEARING_PATH = [[-49,12],[-53,12],[-56.65,12]];
 export const BRIDGE = { x: riverX(4), z: 4, halfLength: 5.7, halfWidth: 1.24 };
 export const SPAWN = { x: 9.5, z: 22 };
 export function riverX(z) { return -8 + Math.sin(z * .047 + .15) * 8 + Math.sin(z * .019) * 2; }
@@ -28,10 +33,17 @@ export function woodlandAmount(x, z) {
 }
 export function pathDistance(x, z) {
   let d = Infinity;
-  for (const line of [path, cottagePath, WOODLAND_PATH, landingPath]) {
+  for (const line of [path, cottagePath, WOODLAND_PATH, landingPath, GARDEN_PATH, CLEARING_PATH]) {
     for (let i = 1; i < line.length; i++) d = Math.min(d, segmentDistance(x, z, ...line[i - 1], ...line[i]));
   }
+  d = Math.min(d, Math.abs(Math.hypot(x-CLEARING.x,z-CLEARING.z)-2.85));
   return d;
+}
+export function inGarden(x,z,margin=0) {
+  return Math.abs(x-GARDEN.x)<GARDEN.halfX+margin && Math.abs(z-GARDEN.z)<GARDEN.halfZ+margin;
+}
+export function inClearing(x,z,margin=0) {
+  return Math.hypot(x-CLEARING.x,z-CLEARING.z)<CLEARING.radius+margin;
 }
 export function bridgeHeight(x, z) {
   const dx = Math.abs(x - BRIDGE.x);
@@ -56,6 +68,12 @@ function terrainProfile(x, z) {
   if (d > width + .25) h = lerp(h, .9, approach);
   const home = Math.max(Math.abs(x - COTTAGE.x) / 6.2, Math.abs(z - COTTAGE.z) / 5.4);
   h = lerp(h, COTTAGE.y, 1 - smoothstep(1, 1.65, home));
+  // Gently settle the garden and well into the land. The same triangles are used
+  // for rendering, planting and walking; neither destination is a floating slab.
+  const garden = Math.max(Math.abs(x-GARDEN.x)/GARDEN.halfX,Math.abs(z-GARDEN.z)/GARDEN.halfZ);
+  h = lerp(h,GARDEN.y,1-smoothstep(.9,1.65,garden));
+  const glade = Math.hypot(x-CLEARING.x,z-CLEARING.z);
+  h = lerp(h,CLEARING.y,1-smoothstep(CLEARING.radius,CLEARING.radius+2.7,glade));
   return h;
 }
 
@@ -124,6 +142,7 @@ export function groundHeight(x, z) {
   return Math.max(terrainHeight(x, z), bridge ?? -Infinity, cottageFloorHeight(x, z) ?? -Infinity, landingHeight(x, z) ?? -Infinity);
 }
 export function reserved(x, z, margin = 0) {
+  if(inGarden(x,z,Math.max(0,margin)) || inClearing(x,z,Math.max(0,margin)))return true;
   if (onLanding(x,z,Math.max(0,margin)+.12)) return true;
   if (terrainHeight(x, z) < WATER_Y + .09) return true;
   if (riverDistance(x, z) < riverWidth(z) + margin) return true;

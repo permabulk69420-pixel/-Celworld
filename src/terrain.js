@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { terrainHeight, pathDistance, WATER_Y, TERRAIN_SIZE, woodlandAmount } from './land.js';
+import { terrainHeight, pathDistance, WATER_Y, TERRAIN_SIZE, woodlandAmount, GARDEN, GARDEN_BEDS, CLEARING } from './land.js';
 import { fbm, noise, lerp, smoothstep, TAU } from './math.js';
 import { paintedMaterial, waterMaterial } from './materials.js';
 
@@ -20,6 +20,10 @@ export function makeTerrain(scene, trees) {
     c.copy(green).lerp(patch > .48 ? light : dark, Math.abs(patch - .48) * 2.7);
     c.multiplyScalar(.96 + .09 * noise(x * .7, z * .7));
     c.lerp(woodland,woodlandAmount(x,z)*.64);
+    const garden = Math.max(Math.abs(x-GARDEN.x)/GARDEN.halfX,Math.abs(z-GARDEN.z)/GARDEN.halfZ);
+    c.lerp(earth,(1-smoothstep(.9,1.2,garden))*.8);
+    const glade = Math.hypot(x-CLEARING.x,z-CLEARING.z);
+    c.lerp(earth,(1-smoothstep(CLEARING.radius-.5,CLEARING.radius+1,glade))*.67);
     const bankTone = 1 - smoothstep(WATER_Y + .12, WATER_Y + .7, h);
     c.lerp(bank, bankTone * .85);
     c.lerp(wetEarth, 1 - smoothstep(WATER_Y - .08, WATER_Y + .12, h));
@@ -34,6 +38,14 @@ export function makeTerrain(scene, trees) {
     }
     const houseShade = Math.max(Math.abs(x - 18.7) / 5.4, Math.abs(z + 21.2) / 4.6);
     shadow = Math.max(shadow, (1 - smoothstep(.82,1.17,houseShade)) * .29);
+    const arbourShade=Math.max(Math.abs(x-GARDEN.x-2.0)/2.25,Math.abs(z+1.45)/1.68);
+    shadow=Math.max(shadow,(1-smoothstep(.5,1.15,arbourShade))*(.18+.13*noise(x*3.1,z*3.1)));
+    for(const [bx,bz] of GARDEN_BEDS){
+      const bedShade=Math.max(Math.abs(x-bx)/.94,Math.abs(z-bz)/1.36);
+      shadow=Math.max(shadow,(1-smoothstep(.9,1.35,bedShade))*.16);
+    }
+    const wellShade=Math.max(Math.abs(x-CLEARING.x-1.5)/2.1,Math.abs(z-CLEARING.z+1.0)/1.65);
+    shadow=Math.max(shadow,(1-smoothstep(.7,1.22,wellShade))*.25);
     c.multiplyScalar(1 - shadow);
     colors.set([c.r, c.g, c.b], i * 3);
   }

@@ -2,17 +2,27 @@ import fs from 'node:fs';
 import * as THREE from 'three';
 import { createWorld } from '../src/world.js';
 import { time, eye, sun } from '../src/materials.js';
-import { terrainHeight, SPAWN, COTTAGE, cottageWorld, LANDING } from '../src/land.js';
+import { terrainHeight, SPAWN, COTTAGE, cottageWorld, LANDING, GARDEN, CLEARING, BRIDGE } from '../src/land.js';
 
 // CPU visual QA for the source scene when the provided browser has no WebGL.
 // This reads the actual geometry, instances and material uniforms. It is not a headset capture.
 const W=1440,H=960;
 const view=process.argv[2]||'overview';
-const views=['overview','interior','willow','woodland','landing','ground','river','bank','cottage'];
+const views=['overview','interior','willow','woodland','landing','ground','river','bank','cottage','garden','arbour','clearing','well','bridge'];
 if(!views.includes(view))throw new Error('Choose a view: '+views.join(', '));
 const world=createWorld();
 const camera=new THREE.PerspectiveCamera(58,W/H,.06,900);
-if(view==='interior'){
+if(view==='garden'){
+  camera.position.set(31,7.5,7);camera.lookAt(GARDEN.x,3.55,-4.5);
+}else if(view==='arbour'){
+  camera.position.set(GARDEN.x,GARDEN.y+1.7,3.8);camera.lookAt(GARDEN.x,GARDEN.y+1.6,-6.8);
+}else if(view==='clearing'){
+  camera.position.set(-52,terrainHeight(-52,17)+1.7,17);camera.lookAt(CLEARING.x,CLEARING.y+1.45,CLEARING.z);
+}else if(view==='well'){
+  camera.position.set(CLEARING.x+2.8,CLEARING.y+1.7,CLEARING.z+1.5);camera.lookAt(CLEARING.x,CLEARING.y+.9,CLEARING.z);
+}else if(view==='bridge'){
+  camera.position.set(7.5,3.8,10);camera.lookAt(BRIDGE.x,1.95,BRIDGE.z);
+}else if(view==='interior'){
   const p=cottageWorld(-.55,2.0),t=cottageWorld(.25,-1.6);
   camera.fov=68;camera.updateProjectionMatrix();
   camera.position.set(p.x,COTTAGE.y+2.024,p.z);camera.lookAt(t.x,COTTAGE.y+1.6,t.z);
@@ -185,7 +195,7 @@ function drawTriangle(a,b,c,buf,mesh,kind,u,flip){
 }
 for(const mesh of objects){
   const g=mesh.geometry,u=mesh.material.uniforms,attr=g.attributes,pos=attr.position;
-  const kind=u.uGlass?'glass':u.uOrigin?'smoke':attr.offset?'grass':mesh.name==='The winding stream'?'water':'paint';
+  const kind=u.uGlass?'glass':u.uOrigin?'smoke':attr.offset?'grass':attr.waterDepth?'water':'paint';
   const count=mesh.isInstancedMesh?mesh.count:g.isInstancedBufferGeometry?g.instanceCount:1;
   const buf=new Float64Array(pos.count*V),indices=g.index?.array;
   for(let inst=0;inst<count;inst++){

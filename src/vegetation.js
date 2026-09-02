@@ -21,7 +21,7 @@ export function treeLayout() {
     trees.push({ x, z, s: .76 + rng() * .85 });
     if (trees.length >= 48) break;
   }
-  const birches=[[-39,23],[-44,33],[-53,26],[-54,17],[-45,16],[-44,9],[-53,6],[-48,-2],[-39,-7],[-34,-3],[-36,16],[-37,35]];
+  const birches=[[-39,23],[-44,33],[-53,26],[-54,17],[-45,16],[-44,9],[-53,6],[-48,-2],[-39,-7],[-34,-3],[-36,16],[-37,35],[-62,4],[-67,12],[-64,21],[-56,23]];
   birches.forEach(([x,z],i)=>trees.push({x,z,s:.9+(i%4)*.08,kind:'birch'}));
   trees.push({...WILLOW,kind:'willow'});
   return trees;

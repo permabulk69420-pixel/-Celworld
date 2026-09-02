@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { createWorld } from '../src/world.js';
 import { Walker, resolveCollision } from '../src/locomotion.js';
-import { COTTAGE, COTTAGE_FLOOR, cottageLocal, cottageWorld, groundHeight, LANDING, WOODLAND_PATH } from '../src/land.js';
+import { COTTAGE, COTTAGE_FLOOR, cottageLocal, cottageWorld, groundHeight, LANDING, WOODLAND_PATH, GARDEN, GARDEN_PATH, CLEARING, CLEARING_PATH } from '../src/land.js';
 
 const world=createWorld();
 world.scene.updateMatrixWorld(true);
@@ -57,5 +57,51 @@ test('the woodland trail centre remains clear of trees, logs and benches',()=>{
       const p=resolveCollision(x,z,world.colliders);
       assert.ok(Math.hypot(p.x-x,p.z-z)<.015,`clear trail at ${x.toFixed(2)}, ${z.toFixed(2)}`);
     }
+  }
+});
+
+function clearRoute(line) {
+  for(let i=1;i<line.length;i++){
+    const [ax,az]=line[i-1],[bx,bz]=line[i],count=Math.ceil(Math.hypot(bx-ax,bz-az)*8);
+    for(let j=0;j<=count;j++){
+      const x=ax+(bx-ax)*j/count,z=az+(bz-az)*j/count,p=resolveCollision(x,z,world.colliders);
+      assert.ok(Math.hypot(p.x-x,p.z-z)<.012,`unobstructed route at ${x.toFixed(2)}, ${z.toFixed(2)}`);
+    }
+  }
+}
+
+test('the garden loop and both entrances remain walkable between the planting beds',()=>{
+  clearRoute(GARDEN_PATH);
+  const walker=new Walker(GARDEN.x,3.6,world.colliders);
+  for(let i=0;i<480;i++)walker.step(1/72,input,{x:0,z:-1});
+  assert.ok(walker.z<-11,'walk the full garden aisle and leave through the rear');
+  assert.ok(Math.abs(walker.x-GARDEN.x)<.01);
+  assert.ok(Math.abs(walker.y-groundHeight(walker.x,walker.z))<.02);
+});
+
+test('the arbour has standing headroom through its wood, leaves and hanging flowers',()=>{
+  const parts=['The cottage kitchen garden','Leaves over the garden arbour','Hanging wisteria flowers'].map(name=>world.scene.getObjectByName(name));
+  for(const offset of [-.65,0,.65]){
+    const ray=new THREE.Raycaster(new THREE.Vector3(GARDEN.x+offset,GARDEN.y+2.05,2),new THREE.Vector3(0,0,-1),0,4.2);
+    assert.equal(ray.intersectObjects(parts).length,0,`clear headroom at aisle offset ${offset}`);
+  }
+});
+
+test('the well has an accessible approach and a complete walking loop around its walls',()=>{
+  clearRoute(CLEARING_PATH);
+  const loop=Array.from({length:65},(_,i)=>[CLEARING.x+Math.cos(i*Math.PI/32)*2.85,CLEARING.z+Math.sin(i*Math.PI/32)*2.85]);
+  clearRoute(loop);
+  const walker=new Walker(-49,12,world.colliders);
+  for(let i=0;i<255;i++)walker.step(1/72,input,{x:-1,z:0});
+  assert.ok(walker.x<-56.7,'reach the well apron from the woodland trail');
+  assert.ok(Math.abs(walker.y-groundHeight(walker.x,walker.z))<.02);
+  const water=world.scene.getObjectByName('Water inside the woodland well');
+  const walls=world.scene.getObjectByName('Stone walls of the woodland well');
+  for(let i=0;i<112;i++){
+    const angle=i*Math.PI/56;
+    const ray=new THREE.Raycaster(new THREE.Vector3(CLEARING.x,CLEARING.y+.54,CLEARING.z),new THREE.Vector3(Math.sin(angle),0,Math.cos(angle)),0,1.3);
+    const hits=ray.intersectObject(walls);
+    assert.ok(hits.length&&hits[0].distance<=water.geometry.parameters.radius,
+      'stone walls meet the water at every angle, including between the blocks');
   }
 });

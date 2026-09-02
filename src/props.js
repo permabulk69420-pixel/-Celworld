@@ -4,18 +4,24 @@ import { random, TAU } from './math.js';
 import { paintedMaterial } from './materials.js';
 import { Sculpture, instances } from './geometry.js';
 import { cottageWall, cottageCollider, makeInterior, windowGlass } from './interior.js';
+import { lantern, leafShape } from './craft.js';
 
 export function makeBridge(scene, colliders) {
   const s = new Sculpture(paintedMaterial());
   const rng = random(494);
   const { x: cx, z: cz, halfLength: length, halfWidth: width } = BRIDGE;
   const wood = ['#ad8354','#9c754d','#b58a57','#a47b4e'];
+  const ivy=[];
   for (let i = 0; i < 34; i++) {
     const x = cx - length + (i + .5) * length * 2 / 34;
     const y = bridgeHeight(x,cz);
     const slope = -.62 * Math.PI / (2 * length) * Math.sin((x-cx) / length * Math.PI*.5);
     s.box([x,y-.065,cz],[length*2/34-.009,.13,width*2+.22],wood[Math.floor(rng()*wood.length)],[0,0,Math.atan(slope)]);
     for (const z of [cz-width+.15,cz+width-.15]) s.ellipsoid([x,y+.009,z],[.018,.005,.018],'#4b4437',0);
+    if(i%3===0)for(let j=0;j<2;j++){
+      const pz=cz+(rng()-.5)*width*1.65;
+      s.box([x+(rng()-.5)*.12,y+.001,pz],[.008,.004,.18+rng()*.32],'#98764f',[0,0,Math.atan(slope)]);
+    }
   }
   for (const side of [-1,1]) {
     const z=cz+side*(width+.05);
@@ -25,6 +31,17 @@ export function makeBridge(scene, colliders) {
       s.box([x,y+.48,z],[.12,1.13,.12],'#766047',[0,(i%2)*.07,0]);
       s.box([x,y+1.07,z],[.2,.08,.2],'#aa8b5d');
       rail.push([x,y+.97,z]);
+      if(i===0||i===6){
+        const ground=terrainHeight(x,z);
+        for(let row=0;row<3;row++)s.box([x,ground-.12+row*.21,z],[.45,.2,.48],['#959d85','#afb096','#a1a88e'][row],[0,(row%2)*.06,0]);
+        s.beam([x,ground+.12,z],[x,y+1.95,z],.057,'#887755',.043,8);
+        s.beam([x,y+1.95,z],[x+(i===0?.22:-.22),y+2,z],.034,'#887755',.028,6);
+        lantern(s,x+(i===0?.22:-.22),y+1.66,z,.75);
+        for(let k=0;k<18;k++){
+          const px=x+(rng()-.5)*.3,py=y+.18+rng()*.68;
+          ivy.push({position:[px,py,z+side*.105],scale:[.7+rng()*.5,1,.7+rng()*.5],rotation:[-.35,rng()*TAU,.3],color:['#779355','#98aa6b','#62884e'][k%3]});
+        }
+      }
       if(i>0){
         s.beam(rail[i-1],rail[i],.068,'#ae8a5c',.068,6);
         s.beam([rail[i-1][0],rail[i-1][1]-.51,z],[rail[i][0],rail[i][1]-.51,z],.038,'#84704c',.038,5);
@@ -35,6 +52,7 @@ export function makeBridge(scene, colliders) {
     colliders.push({type:'box',x:cx,z,halfX:length,halfZ:.09,angle:0});
   }
   s.finish(scene,'The little arched bridge');
+  instances(scene,leafShape(.21,.077,.035),paintedMaterial({side:THREE.DoubleSide,wind:.01}),ivy,'Leaves climbing the bridge posts');
 }
 
 function roofPatch(x0,x1,z0,z1,side) {
