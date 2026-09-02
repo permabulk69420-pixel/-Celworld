@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { terrainHeight, pathDistance, WATER_Y, TERRAIN_SIZE } from './land.js';
+import { terrainHeight, pathDistance, WATER_Y, TERRAIN_SIZE, woodlandAmount } from './land.js';
 import { fbm, noise, lerp, smoothstep, TAU } from './math.js';
 import { paintedMaterial, waterMaterial } from './materials.js';
 
@@ -11,6 +11,7 @@ export function makeTerrain(scene, trees) {
   const green = new THREE.Color('#819f4e'), light = new THREE.Color('#b0b966');
   const dark = new THREE.Color('#56845b'), earth = new THREE.Color('#c2ae7e');
   const bank = new THREE.Color('#9da47b'), wetEarth = new THREE.Color('#657d62');
+  const woodland = new THREE.Color('#83926b');
   const c = new THREE.Color();
   for (let i = 0; i < position.count; i++) {
     const x = position.getX(i), z = position.getZ(i), h = terrainHeight(x, z);
@@ -18,6 +19,7 @@ export function makeTerrain(scene, trees) {
     const patch = fbm(x * .073 + 40, z * .073 + 20);
     c.copy(green).lerp(patch > .48 ? light : dark, Math.abs(patch - .48) * 2.7);
     c.multiplyScalar(.96 + .09 * noise(x * .7, z * .7));
+    c.lerp(woodland,woodlandAmount(x,z)*.64);
     const bankTone = 1 - smoothstep(WATER_Y + .12, WATER_Y + .7, h);
     c.lerp(bank, bankTone * .85);
     c.lerp(wetEarth, 1 - smoothstep(WATER_Y - .08, WATER_Y + .12, h));

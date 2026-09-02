@@ -4,10 +4,13 @@ export const WATER_Y = .18;
 export const WORLD_RADIUS = 88;
 export const TERRAIN_SIZE = 212;
 export const COTTAGE = { x: 16, z: -19, y: 2.55, rotation: -.12 };
+export const COTTAGE_FLOOR = .324;
+export const LANDING = { x: -2.85, z: 26, y: 1.24, halfX: 1.85, halfZ: 1.65, approachX: -8.1, approachHalfWidth: .83 };
+export const WILLOW = { x: -9.2, z: 23, s: 1.12 };
 export const BRIDGE = { x: riverX(4), z: 4, halfLength: 5.7, halfWidth: 1.24 };
 export const SPAWN = { x: 9.5, z: 22 };
 export function riverX(z) { return -8 + Math.sin(z * .047 + .15) * 8 + Math.sin(z * .019) * 2; }
-export function riverWidth(z) { return 2.35 + Math.sin(z * .039 + 1.7) * .38; }
+export function riverWidth(z) { return 2.35 + Math.sin(z * .039 + 1.7) * .38 + 1.7 * Math.exp(-(((z - 26) / 8.5) ** 2)); }
 export function riverDistance(x, z) { return Math.abs(x - riverX(z)); }
 
 const path = [
@@ -18,9 +21,14 @@ const cottagePath = [
   [BRIDGE.x + 5.7, 4], [3, 1], [8, -4], [11, -9], [15, -12.5],
   [22, -12], [29, -18], [33, -30], [27, -45],
 ];
+export const WOODLAND_PATH = [[-21,22],[-31,30],[-41,29],[-49,20],[-49,8],[-43,-3],[-34,-9],[-25,-5],[-17,10]];
+const landingPath = [[-21,22],[-17,24],[-12,26],[LANDING.approachX,LANDING.z]];
+export function woodlandAmount(x, z) {
+  return 1 - smoothstep(.5, 1.2, Math.hypot((x + 42) / 17, (z - 14) / 26));
+}
 export function pathDistance(x, z) {
   let d = Infinity;
-  for (const line of [path, cottagePath]) {
+  for (const line of [path, cottagePath, WOODLAND_PATH, landingPath]) {
     for (let i = 1; i < line.length; i++) d = Math.min(d, segmentDistance(x, z, ...line[i - 1], ...line[i]));
   }
   return d;
@@ -80,11 +88,43 @@ export function riverBankX(z, side) {
   }
   return center + side * high;
 }
+
+export function cottageLocal(x, z) {
+  const dx = x - COTTAGE.x, dz = z - COTTAGE.z, c = Math.cos(COTTAGE.rotation), s = Math.sin(COTTAGE.rotation);
+  return { x: dx * c - dz * s, z: dx * s + dz * c };
+}
+export function cottageWorld(x, z) {
+  const c = Math.cos(COTTAGE.rotation), s = Math.sin(COTTAGE.rotation);
+  return { x: COTTAGE.x + x * c + z * s, z: COTTAGE.z - x * s + z * c };
+}
+export function cottageFloorHeight(x, z) {
+  const p = cottageLocal(x, z);
+  if (Math.abs(p.x) < 3.48 && p.z > -3.02 && p.z < 3.0) return COTTAGE.y + COTTAGE_FLOOR;
+  for (let i = 0; i < 3; i++) {
+    const center = 3.15 + i * .34;
+    if (Math.abs(p.x + .8) < .86 + i * .06 && Math.abs(p.z - center) < .2) return COTTAGE.y + .3 - i * .1;
+  }
+  return null;
+}
+export function landingHeight(x, z) {
+  if (Math.abs(x - LANDING.x) <= LANDING.halfX && Math.abs(z - LANDING.z) <= LANDING.halfZ) return LANDING.y;
+  const edge = LANDING.x - LANDING.halfX;
+  if (x >= LANDING.approachX && x < edge && Math.abs(z - LANDING.z) <= LANDING.approachHalfWidth) {
+    const t = (x - LANDING.approachX) / (edge - LANDING.approachX);
+    return Math.max(terrainHeight(x, z) + .035, lerp(terrainHeight(LANDING.approachX, LANDING.z) + .035, LANDING.y, t));
+  }
+  return null;
+}
+export function onLanding(x,z,margin=0) {
+  return (Math.abs(x-LANDING.x)<LANDING.halfX+margin && Math.abs(z-LANDING.z)<LANDING.halfZ+margin)
+    || (x>LANDING.approachX-margin && x<LANDING.x-LANDING.halfX+margin && Math.abs(z-LANDING.z)<LANDING.approachHalfWidth+margin);
+}
 export function groundHeight(x, z) {
   const bridge = bridgeHeight(x, z);
-  return bridge === null ? terrainHeight(x, z) : Math.max(bridge, terrainHeight(x, z));
+  return Math.max(terrainHeight(x, z), bridge ?? -Infinity, cottageFloorHeight(x, z) ?? -Infinity, landingHeight(x, z) ?? -Infinity);
 }
 export function reserved(x, z, margin = 0) {
+  if (onLanding(x,z,Math.max(0,margin)+.12)) return true;
   if (terrainHeight(x, z) < WATER_Y + .09) return true;
   if (riverDistance(x, z) < riverWidth(z) + margin) return true;
   if (pathDistance(x, z) < 1.2 + margin) return true;

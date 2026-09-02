@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { random, TAU, noise, smoothstep } from './math.js';
-import { terrainHeight, reserved, pathDistance, riverDistance, riverWidth, COTTAGE } from './land.js';
+import { terrainHeight, reserved, pathDistance, riverDistance, riverWidth, COTTAGE, woodlandAmount, WILLOW } from './land.js';
 import { paintedMaterial, grassMaterial } from './materials.js';
 import { Sculpture, instances } from './geometry.js';
 
@@ -21,6 +21,9 @@ export function treeLayout() {
     trees.push({ x, z, s: .76 + rng() * .85 });
     if (trees.length >= 48) break;
   }
+  const birches=[[-39,23],[-44,33],[-53,26],[-54,17],[-45,16],[-44,9],[-53,6],[-48,-2],[-39,-7],[-34,-3],[-36,16],[-37,35]];
+  birches.forEach(([x,z],i)=>trees.push({x,z,s:.9+(i%4)*.08,kind:'birch'}));
+  trees.push({...WILLOW,kind:'willow'});
   return trees;
 }
 
@@ -43,6 +46,25 @@ export function makeTrees(scene, trees, colliders) {
   for (const t of trees) {
     const { x, z, s } = t;
     const y = terrainHeight(x, z);
+    if(t.kind==='willow')continue;
+    if(t.kind==='birch'){
+      const nodes=[[x,y,z],[x+.14*s,y+3.1*s,z-.13*s],[x-.16*s,y+6*s,z+.1*s],[x+.13*s,y+8.5*s,z]];
+      for(let j=1;j<nodes.length;j++)trunks.beam(nodes[j-1],nodes[j],(.23-j*.044)*s,'#d7d7b4',(.19-j*.038)*s,9);
+      for(let j=0;j<15;j++){
+        const a=j*2.39996,h=(.35+j*.43)*s,r=(.205-j*.006)*s;
+        trunks.box([x+Math.sin(a)*r,y+h,z+Math.cos(a)*r],[.15*s,.023*s,.009*s],'#727969',[0,a,.11]);
+      }
+      for(let j=0;j<5;j++){
+        const a=j*2.39996;
+        trunks.beam([x,y+(4.9+j*.37)*s,z],[x+Math.cos(a)*1.55*s,y+(6.45+j*.33)*s,z+Math.sin(a)*1.55*s],.065*s,'#b8bba1',.016*s,5);
+      }
+      for(let j=0;j<13;j++){
+        const a=j*2.39996,r=Math.sqrt(j/12)*1.68*s,size=(.82+rng()*.45)*s;
+        lobes.push({position:[x+Math.cos(a)*r,y+(8.2-(j/12)*1.4+rng()*.8)*s,z+Math.sin(a)*r],scale:[size,size*1.06,size*.87],rotation:[.1,rng()*TAU,.15],color:['#87a468','#a8b977','#779a61','#b3c585'][j%4]});
+      }
+      colliders.push({type:'circle',x,z,radius:.22*s});
+      continue;
+    }
     const lean = (rng() - .5) * .9 * s;
     trunks.beam([x, y, z], [x + lean * .4, y + 3.2 * s, z - .2 * s], .48 * s, '#685a37', .32 * s, 9);
     trunks.beam([x + lean * .4, y + 3 * s, z - .2 * s], [x + lean, y + 5.5 * s, z + .15 * s], .35 * s, '#796a3c', .14 * s, 8);
@@ -98,7 +120,7 @@ export function makeGrass(scene, trees) {
   geometry.setIndex([0,1,2, 1,3,2, 2,3,4]);
   const patches = [];
   let count = 0;
-  const c = new THREE.Color(), base = new THREE.Color('#7c9d3a'), light = new THREE.Color('#9aaf4c');
+  const c = new THREE.Color(), base = new THREE.Color('#7c9d3a'), light = new THREE.Color('#9aaf4c'), forestGreen=new THREE.Color('#657e49');
   for (let gz = -6; gz <= 6; gz++) for (let gx = -6; gx <= 6; gx++) {
     const cx = gx * 12, cz = gz * 12;
     if (Math.hypot(cx, cz) > 90) continue;
@@ -109,10 +131,12 @@ export function makeGrass(scene, trees) {
       if (Math.abs(x - COTTAGE.x) < 6 && Math.abs(z - COTTAGE.z) < 5) continue;
       if (trees.some(t => Math.hypot(x - t.x, z - t.z) < .6 * t.s)) continue;
       const field = noise(x * .115 + 10, z * .115 + 30);
-      const height = (.24 + rng() * .51) * (.67 + field * .7);
+      const forest = woodlandAmount(x,z);
+      const height = (.24 + rng() * .51) * (.67 + field * .7) * (1-forest*.2);
       offsets.push(x, terrainHeight(x, z) - .022, z);
       blades.push(rng() * TAU, height, .062 + rng() * .085, (rng() - .5) * .16);
       c.copy(base).lerp(light, field * .75 + rng() * .2);
+      c.lerp(forestGreen,forest*.35);
       c.multiplyScalar(.83 + rng() * .25);
       for (const tree of trees) {
         const d = Math.hypot((x - tree.x - tree.s * 1.8) / (tree.s * 3.9), (z - tree.z + tree.s * 1.4) / (tree.s * 3.2));

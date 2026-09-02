@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { random, noise, TAU } from './math.js';
-import { terrainHeight, pathDistance, riverBankX, reserved, WATER_Y, COTTAGE, BRIDGE } from './land.js';
+import { terrainHeight, pathDistance, riverBankX, reserved, WATER_Y, COTTAGE, BRIDGE, onLanding } from './land.js';
 import { paintedMaterial } from './materials.js';
 import { Sculpture, instances, spatialInstances } from './geometry.js';
 
@@ -105,7 +105,7 @@ export function makeUndergrowth(scene, trees) {
     if (Math.abs(z - BRIDGE.z) < 3.8 || noise(z * .16 + 8, side * 4 + 30) < .46) continue;
     const bank = riverBankX(z, side);
     const x = bank + side * (.14 + rng() * .46);
-    if (pathDistance(x, z) < 1.7) continue;
+    if (pathDistance(x, z) < 1.7 || onLanding(x,z,.5)) continue;
     plant(reeds, x, z, .62 + rng() * .34);
     for (let j = 0; j < 3; j++) {
       const fx = bank + side * (.8 + rng() * 1.8), fz = z + (rng() - .5) * 2;

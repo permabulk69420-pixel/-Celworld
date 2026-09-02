@@ -1,13 +1,14 @@
 {
   "name": "celworld",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "render": "node tools/render-scene.mjs"
   },
   "dependencies": {
     "three": "0.180.0"

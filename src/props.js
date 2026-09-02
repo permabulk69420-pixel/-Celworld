@@ -1,8 +1,9 @@
 import * as THREE from 'three';
-import { COTTAGE, BRIDGE, bridgeHeight, terrainHeight, riverBankX } from './land.js';
+import { COTTAGE, BRIDGE, bridgeHeight, terrainHeight, riverBankX, onLanding } from './land.js';
 import { random, TAU } from './math.js';
 import { paintedMaterial } from './materials.js';
 import { Sculpture, instances } from './geometry.js';
+import { cottageWall, cottageCollider, makeInterior, windowGlass } from './interior.js';
 
 export function makeBridge(scene, colliders) {
   const s = new Sculpture(paintedMaterial());
@@ -61,7 +62,13 @@ export function makeCottage(scene, colliders) {
   const rng=random(808);
   const plaster='#e2d5aa', timber='#65543a', trim='#e6d8b1', blue='#547b72';
   s.box([0,.15,0],[7.05,.3,6.12],'#8e8970');
-  s.box([0,1.82,0],[6.8,3.3,5.8],plaster);
+  cottageWall(s,6.86,2.94,0,[
+    {left:-1.45,right:-.14,bottom:.3,top:2.59},
+    {left:1.16,right:2.5,bottom:1.35,top:2.69},
+  ],plaster);
+  cottageWall(s,6.86,2.94,Math.PI,[{left:-2.045,right:-.795,bottom:1.35,top:2.69}],plaster);
+  cottageWall(s,5.84,3.43,-Math.PI/2,[{left:-.47,right:.71,bottom:1.35,top:2.69}],plaster);
+  cottageWall(s,5.84,3.43,Math.PI/2,[{left:.15,right:1.45,bottom:1.35,top:2.65}],plaster);
   // Front and rear gables.
   for(const z of [-2.92,2.92]){
     const g=new THREE.BufferGeometry();
@@ -74,14 +81,15 @@ export function makeCottage(scene, colliders) {
     s.box([0,3.52,z*1.009],[6.96,.14,.13],timber);
   }
   for(const x of [-3.43,3.43]){
-    s.box([x,1.78,0],[.18,3.35,5.97],timber);
-    // Expose cream plaster between thin exterior corner posts.
-    s.box([x+(x>0?.102:-.102),1.81,0],[.03,3.05,5.43],plaster);
     for(const z of [-2.9,2.9])s.box([x,1.75,z],[.19,3.38,.19],timber);
   }
   for(const z of [-2.94,2.94]) {
-    s.box([0,.44,z],[6.98,.17,.14],timber);
-    for(const x of [-3.38,-.35,3.38])s.box([x,1.95,z],[.13,3.35,.14],timber);
+    if(z<0)s.box([0,.44,z],[6.98,.17,.14],timber);
+    else{
+      s.box([-2.505,.44,z],[1.97,.17,.14],timber);
+      s.box([1.71,.44,z],[3.56,.17,.14],timber);
+    }
+    for(const x of z<0?[-3.38,-.35,3.38]:[-3.38,3.38])s.box([x,1.95,z],[.13,3.35,.14],timber);
   }
   const tileColors=['#b1694c','#c77b53','#b97553','#cd875d','#a76248','#b66d4c'];
   for(const side of [-1,1]) for(let row=0;row<8;row++)for(let tile=0;tile<16;tile++){
@@ -96,19 +104,15 @@ export function makeCottage(scene, colliders) {
     s.box([side*3.53,3.36,0],[.12,.17,6.2],timber);
   }
   // Recessed front door, stone threshold and small porch.
-  s.box([-.8,1.43,3.012],[1.26,2.18,.12],'#3e6158');
-  s.box([-.8,1.41,3.093],[1.05,1.97,.03],'#527467');
-  for(let i=0;i<5;i++)s.box([-.8-.4+i*.2,1.42,3.121],[.011,1.95,.007],'#405d53');
   s.box([-.8,2.68,3.06],[1.58,.16,.26],timber);
   for(const x of [-1.52,-.07])s.box([x,1.45,3.06],[.14,2.54,.23],timber);
-  s.ellipsoid([-.39,1.41,3.17],[.047,.047,.05],'#d4af67',1);
-  for(let i=0;i<3;i++)s.box([-.8,.085-i*.095,3.22+i*.37],[1.8+i*.14,.15,.5],'#b0ac92');
+  for(let i=0;i<3;i++)s.box([-.8,.25-i*.1,3.15+i*.34],[1.72+i*.12,.1,.4],'#b0ac92');
   // Windows are made at human scale with frames, panes, open shutters and flower boxes.
+  const glass=[];
   const window=(x,y,z,w=1.34,facing=0)=>{
     const firstPart=s.parts.length;
-    s.box([x,y,z],[w,1.34,.085],'#314c46');
-    s.box([x,y+.05,z+.05],[w-.12,1.12,.026],'#679899');
-    s.box([x-.26,y+.28,z+.069],[.29,.41,.012],'#aecac1',[0,0,-.12]);
+    const glassPosition=new THREE.Vector3(x,y,z+.047).applyAxisAngle(THREE.Object3D.DEFAULT_UP,facing);
+    glass.push({position:glassPosition.toArray(),scale:[w-.09,1.28,1],rotation:[0,facing,0]});
     for(const a of [-1,1]){
       s.box([x+a*w*.53,y,z+.075],[.095,1.5,.13],trim);
       s.box([x,y+a*.71,z+.075],[w+.2,.095,.13],trim);
@@ -129,8 +133,7 @@ export function makeCottage(scene, colliders) {
   window(1.83,2.02,3.02);
   window(-1.42,2.02,3.02,1.25,Math.PI);
   window(.12,2.02,3.57,1.18,-Math.PI/2);
-  s.box([3.59,2.0,-.8],[.065,1.25,1.3],'#365a53');
-  s.box([3.637,2.0,-.8],[.026,1.09,1.15],'#719995');
+  glass.push({position:[3.61,2,-.8],scale:[1.27,1.26,1],rotation:[0,Math.PI/2,0]});
   for(const side of [-1,1]){
     s.box([3.655,2.0,-.8+side*.685],[.1,1.43,.09],trim);
     s.box([3.655,2.0+side*.685,-.8],[.1,.09,1.46],trim);
@@ -206,7 +209,13 @@ export function makeCottage(scene, colliders) {
     }
   }
   ivy.finish(group,'Ivy climbing the cottage wall');
-  colliders.push({type:'box',x:COTTAGE.x,z:COTTAGE.z,halfX:3.58,halfZ:3.08,angle:COTTAGE.rotation});
+  instances(group,new THREE.PlaneGeometry(1,1),windowGlass(),glass,'Thin cottage window glass');
+  cottageCollider(colliders,-3.43,0,.10,3.02);
+  cottageCollider(colliders,3.43,0,.10,3.02);
+  cottageCollider(colliders,0,-2.94,3.51,.10);
+  cottageCollider(colliders,-2.48,2.94,1.03,.10);
+  cottageCollider(colliders,1.685,2.94,1.825,.10);
+  makeInterior(group,colliders);
   const smoke=new THREE.Vector3(-1.65,6.4,-1.26).applyEuler(group.rotation).add(group.position);
   return { group, smoke };
 }
@@ -218,7 +227,7 @@ export function makeStonesAndGarden(scene, colliders) {
     const z=(rng()-.5)*153;
     const side=rng()>.5?1:-1;
     const x=riverBankX(z,side)+side*(-.1+rng()*1.5);
-    if(Math.abs(z-BRIDGE.z)<2.4)continue;
+    if(Math.abs(z-BRIDGE.z)<2.4||onLanding(x,z,.6))continue;
     const size=.22+rng()*.62;
     const y=terrainHeight(x,z)+.11;
     rocks.push({position:[x,y,z],scale:[size*(1+rng()*.4),size*.68,size],rotation:[rng()*.3,rng()*TAU,rng()*.3],color: ['#a4a68b','#9b9d84','#b1b099','#8c9984'][i%4]});

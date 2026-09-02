@@ -6,6 +6,7 @@ import { time, eye } from './materials.js';
 import { SPAWN } from './land.js';
 import { Walker, readXRInput, rotateOriginAroundHead, TURN_SPEED } from './locomotion.js';
 import { readHeadPose } from './xr-pose.js';
+import { createAmbience } from './ambience.js';
 
 const canvas=document.querySelector('#world');
 const welcome=document.querySelector('#welcome');
@@ -40,6 +41,13 @@ async function start(){
     fail('The valley could not finish rendering. Please reload the page.',new Error([gl.getProgramInfoLog(program),gl.getShaderInfoLog(vertex),gl.getShaderInfoLog(fragment)].join('\n')));
   };
   const {scene,colliders,grass,flowerCount,animateLife}=createWorld();
+  const soundButton=document.querySelector('#sound-toggle');
+  let soundEnabled=true;
+  const ambience=createAmbience(()=>{soundButton.disabled=true;soundButton.textContent='Ambience unavailable';});
+  soundButton.addEventListener('click',()=>{
+    soundEnabled=!soundEnabled;ambience.setEnabled(soundEnabled);
+    soundButton.setAttribute('aria-pressed',String(soundEnabled));soundButton.textContent=soundEnabled?'Ambience on':'Ambience off';
+  });
   const rig=new THREE.Group();
   const camera=new THREE.PerspectiveCamera(58,innerWidth/innerHeight,.06,900);
   rig.add(camera);scene.add(rig);
@@ -70,6 +78,7 @@ async function start(){
     grip.add(palm,thumb,cuff);rig.add(grip);
   }
   const head=new THREE.Vector3(),direction=new THREE.Vector3(),headRotation=new THREE.Quaternion();
+  const soundForward=new THREE.Vector3(),soundUp=new THREE.Vector3(),soundRotation=new THREE.Quaternion();
   let previous=0,elapsed=0,frameCounter=0,paused=false;
   let diagnostic;
   if(inspect){
@@ -80,6 +89,13 @@ async function start(){
   const stop=()=>{walker.stop();previous=0;};
   document.addEventListener('visibilitychange',stop);
   window.addEventListener('blur',stop);
+  document.addEventListener('visibilitychange',()=>{
+    // XR owns its visibility lifecycle; the desktop document can be hidden while
+    // the headset is still presenting a visible immersive session.
+    if(renderer.xr.isPresenting)return;
+    if(document.hidden)ambience.stop();else if(controls.enabled)void ambience.start();
+  });
+  window.addEventListener('pagehide',()=>ambience.stop());
   window.addEventListener('resize',()=>{
     if(renderer.xr.isPresenting)return;
     camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
@@ -88,23 +104,28 @@ async function start(){
   canvas.addEventListener('webglcontextlost',event=>{
     event.preventDefault();fail('The view was interrupted. Reload to return to the valley.');
     renderer.setAnimationLoop(null);
+    ambience.stop();
   });
   look.addEventListener('click',()=>{
+    void ambience.start();
     welcome.classList.add('dismissed');back.hidden=false;help.hidden=false;controls.enabled=true;
     help.replaceChildren();
     const hint=document.createElement('span');hint.textContent='Drag to look around · Pinch or scroll to get closer';help.append(hint);
   });
   back.addEventListener('click',()=>{
+    ambience.stop();
     controls.enabled=false;restoreView();welcome.classList.remove('dismissed');help.hidden=true;back.hidden=true;
   });
 
   renderer.xr.addEventListener('sessionstart',()=>{
+    void ambience.start();
     walker.reset(SPAWN.x,SPAWN.z);rig.position.set(SPAWN.x,walker.y,SPAWN.z);
     rig.rotation.set(0,-.2,0);camera.position.set(0,0,0);camera.rotation.set(0,0,0);
     controls.enabled=false;welcome.classList.add('dismissed');help.hidden=true;back.hidden=true;previous=0;
     document.body.dataset.mode='vr';
   });
   renderer.xr.addEventListener('sessionend',()=>{
+    ambience.stop();
     stop();restoreView();welcome.classList.remove('dismissed');controls.enabled=false;paused=false;
     enter.textContent='Enter VR';enter.disabled=false;sessionStarting=false;document.body.dataset.mode='preview';
     renderer.setSize(innerWidth,innerHeight);
@@ -112,15 +133,20 @@ async function start(){
   enter.addEventListener('click',async()=>{
     if(sessionStarting)return;
     sessionStarting=true;enter.disabled=true;status.textContent='';
+    void ambience.start();
     let session;
     try{
       session=await navigator.xr.requestSession('immersive-vr',{requiredFeatures:['local-floor'],optionalFeatures:['bounded-floor']});
-      session.addEventListener('visibilitychange',()=>{paused=session.visibilityState!=='visible';stop();});
+      session.addEventListener('visibilitychange',()=>{
+        paused=session.visibilityState!=='visible';stop();
+        if(paused)ambience.stop();else void ambience.start();
+      });
       await renderer.xr.setSession(session);
       if(session.supportedFrameRates?.includes(72)){
         try{await session.updateTargetFrameRate(72);}catch{/* Browser keeps its supported default. */}
       }
     }catch(error){
+      ambience.stop();
       if(session)await session.end().catch(()=>{});
       status.textContent=error.name==='NotAllowedError'?'Allow VR access in your headset, then try again.':'Could not enter VR. Try again from the Quest browser.';
       enter.disabled=false;sessionStarting=false;
@@ -151,11 +177,14 @@ async function start(){
     }
     for(const patch of grass.patches)patch.mesh.visible=Math.hypot(patch.x-eye.value.x,patch.z-eye.value.z)<73;
     animateLife(elapsed);
+    if(renderer.xr.isPresenting)soundRotation.copy(headRotation);else camera.getWorldQuaternion(soundRotation);
+    soundForward.set(0,0,-1).applyQuaternion(soundRotation);soundUp.set(0,1,0).applyQuaternion(soundRotation);
+    ambience.update(elapsed,eye.value,soundForward,soundUp);
     renderer.render(scene,camera);
     frameCounter++;
     if(diagnostic&&frameCounter%30===0){
       diagnostic.textContent=[
-        'CELWORLD 0.2 · '+(renderer.xr.isPresenting?'VR':'PREVIEW'),
+        'CELWORLD 0.3 · '+(renderer.xr.isPresenting?'VR':'PREVIEW'),
         'draw calls: '+renderer.info.render.calls,
         'triangles: '+renderer.info.render.triangles.toLocaleString(),
         'grass blades: '+grass.count.toLocaleString(),

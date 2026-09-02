@@ -1,5 +1,6 @@
 node_modules/
 dist/
+renders/
 .sites-runtime/
 *.log
 .DS_Store
