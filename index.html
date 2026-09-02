@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#264c3d" />
+    <meta name="description" content="A sunlit, hand-crafted little world to wander through in VR." />
+    <title>Celworld · A little further</title>
+  </head>
+  <body>
+    <canvas id="world" aria-label="Celworld, a sunlit valley"></canvas>
+    <main id="welcome" class="welcome">
+      <div class="wordmark"><span class="mark" aria-hidden="true">✦</span> CELWORLD</div>
+      <div class="invitation">
+        <p class="eyebrow">THE FIRST VALLEY</p>
+        <h1>A little<br /><em>further.</em></h1>
+        <p class="intro">Follow the water.<br />There’s no hurry.</p>
+        <button id="enter-vr" class="primary" disabled>Opening the valley…</button>
+        <button id="look-around" class="secondary" hidden>Look around</button>
+        <p id="session-status" class="session-status" role="status"></p>
+      </div>
+      <footer><span>WIND IN THE GRASS. SUN ON YOUR FACE.</span><span>01 — THE MEADOW</span></footer>
+    </main>
+    <div id="help" class="help" hidden>
+      <span>Left stick · move</span><span>Right stick · turn</span><span>Left grip · run</span><span>A · jump</span>
+    </div>
+    <button id="return" class="return" hidden aria-label="Return to welcome">↖ Celworld</button>
+    <div id="error" class="error" role="alert" hidden></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
