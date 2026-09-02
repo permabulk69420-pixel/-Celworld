@@ -2,11 +2,22 @@
 
 [Open Celworld in your Quest browser](https://permabulk69420-pixel.github.io/-Celworld/)
 
-A small, sunlit, Ghibli-inspired world built in Three.js for Meta Quest 3. The first valley is a place to wander: thick moving grass, wildflowers, spreading trees, a winding stream, a wooden bridge, and a little clay-roofed cottage.
+A small, sunlit, Ghibli-inspired world built in Three.js for Meta Quest 3. The valley is a place to wander: thick moving grass, wildflowers, spreading trees, a winding stream, a wooden bridge, and an ivy-covered, clay-roofed cottage.
 
-![The first valley](docs/valley.jpg)
+![The meadow valley](docs/valley.jpg)
 
-Local scene renders use the project's geometry and material appearance. They are visual checks, not browser or headset captures. [Standing-height view](docs/standing-view.jpg) · [Cottage details](docs/cottage.jpg).
+Local scene renders use the project's geometry and material appearance. They are visual checks, not browser or headset captures. [Standing-height view](docs/standing-view.jpg) · [The repaired river bend](docs/riverbank.jpg) · [Cottage details](docs/cottage.jpg).
+
+## Version 0.2 — riverbanks and a richer meadow
+
+- The western river bend now has a raised, dry bank. The water is clipped directly against the ground triangles, eliminating the floating edge where the meadow used to dip below the water level.
+- Grass, flowers, stones and player ground sampling share the rendered terrain surface. Meadow plants stay clear of the actual waterline.
+- Depth-coloured shallows, broken shoreline foam, quiet reflection colours, flowing glints and patches of gravel give the stream more detail.
+- Ferns, cattails, blue and lavender lupines, rounded shrubs and pale hydrangeas fill out the banks, woodland floor and cottage garden.
+- Deeper foliage colours, irregular crowns and matching dappled shade on grass and ground add depth. Flower and fern roots stay anchored as their leaves move in the breeze.
+- The cottage has a tiled door canopy, lantern, extra shuttered windows, climbing ivy, a rain pipe and stepping stones.
+
+The movement and controller settings are unchanged.
 
 ## Play
 
@@ -54,6 +65,7 @@ The starting scope is scenery and locomotion. Future iterations can extend the v
 | `src/materials.js` | Painted lighting, wind, grass, water and distance haze |
 | `src/terrain.js` | Ground, stream surface and layered distant hills |
 | `src/vegetation.js` | Trees, canopy leaves, grass patches and wildflowers |
+| `src/undergrowth.js` | Ferns, reeds, lupines, shrubs and hydrangeas |
 | `src/props.js` | Cottage, tile roof, bridge, stones, fence and bench |
 | `src/atmosphere.js` | Sky, clouds, chimney smoke, birds and butterflies |
 | `src/locomotion.js` | Controller mapping, collision and player motion |
@@ -65,19 +77,20 @@ The starting scope is scenery and locomotion. Future iterations can extend the v
 - Instanced, opaque grass blades with wind calculated on the GPU.
 - Grass is grouped into spatial patches, culled by distance, and shrinks away between 40–60 metres.
 - Instanced foliage, leaves, stones and flowers; static architectural details are merged.
+- Detailed fern instances use spatial batches for frustum culling. The water remains a single opaque surface, with no extra reflection render pass.
 - Three-tone lighting, layered haze and baked ground colour provide depth without full-screen effects.
 - No screen-space reflections, bloom, real-time shadow passes, or alpha-cutout grass.
 - Quest settings request 72 Hz when supported, a 0.95 framebuffer scale and fixed foveation of 0.7.
 
-These are rendering choices, not a verified headset frame-rate claim. Actual comfort, controller behaviour and sustained performance need a Quest 3 session.
+The owner reported that the initial build looks and runs well on Quest 3. That feedback is not a measured frame-rate claim; this graphics update still needs an on-device performance check.
 
 ## Validation
 
-`npm test` covers controller handedness, stick drift, headset-centred turning, diagonal speed, sprinting, single-press jumping, narrow-wall collisions, a continuous bridge floor, current headset pose transforms and tracking loss.
+`npm test` runs 13 checks covering controller handedness, stick drift, headset-centred turning, diagonal speed, sprinting, single-press jumping, narrow-wall collisions, a continuous bridge floor, current headset pose transforms and tracking loss. River regressions check both banks along the stream, every exposed water edge against the ground, and the actual grass and flower instances for submerged roots.
 
 Add `?inspect=1` to show a small diagnostic overlay with draw calls, submitted triangles, vegetation counts and shader errors. Keep this information out of the normal experience.
 
-### First-build limits
+### Current limits
 
 - The cottage currently has an exterior only.
 - The stream is shallow and walkable.

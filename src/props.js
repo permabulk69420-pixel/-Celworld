@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { COTTAGE, BRIDGE, bridgeHeight, terrainHeight, riverX, riverWidth, reserved } from './land.js';
+import { COTTAGE, BRIDGE, bridgeHeight, terrainHeight, riverBankX } from './land.js';
 import { random, TAU } from './math.js';
 import { paintedMaterial } from './materials.js';
 import { Sculpture, instances } from './geometry.js';
@@ -104,7 +104,8 @@ export function makeCottage(scene, colliders) {
   s.ellipsoid([-.39,1.41,3.17],[.047,.047,.05],'#d4af67',1);
   for(let i=0;i<3;i++)s.box([-.8,.085-i*.095,3.22+i*.37],[1.8+i*.14,.15,.5],'#b0ac92');
   // Windows are made at human scale with frames, panes, open shutters and flower boxes.
-  const window=(x,y,z,w=1.34)=>{
+  const window=(x,y,z,w=1.34,facing=0)=>{
+    const firstPart=s.parts.length;
     s.box([x,y,z],[w,1.34,.085],'#314c46');
     s.box([x,y+.05,z+.05],[w-.12,1.12,.026],'#679899');
     s.box([x-.26,y+.28,z+.069],[.29,.41,.012],'#aecac1',[0,0,-.12]);
@@ -123,8 +124,11 @@ export function makeCottage(scene, colliders) {
       s.ellipsoid([fx,fy,fz],[.14,.14,.12],'#637e3b',0);
       s.ellipsoid([fx,fy+.11,fz+.03],[.086,.06,.07],k%3?'#e9c16f':'#dd917b',1);
     }
+    if(facing)for(let i=firstPart;i<s.parts.length;i++)s.parts[i].rotateY(facing);
   };
   window(1.83,2.02,3.02);
+  window(-1.42,2.02,3.02,1.25,Math.PI);
+  window(.12,2.02,3.57,1.18,-Math.PI/2);
   s.box([3.59,2.0,-.8],[.065,1.25,1.3],'#365a53');
   s.box([3.637,2.0,-.8],[.026,1.09,1.15],'#719995');
   for(const side of [-1,1]){
@@ -154,6 +158,22 @@ export function makeCottage(scene, colliders) {
   }
   s.box([-1.65,6.24,-1.26],[.91,.17,.99],'#aa967c');
   s.box([-1.65,6.35,-1.26],[.52,.05,.57],'#574d3f');
+  // A little tiled canopy and timber brackets shelter the front doorstep.
+  for(let row=0;row<5;row++)for(let col=0;col<8;col++){
+    const z=3.03+row*.205;
+    s.box([-1.75+col*.27,3.015-row*.05,z],[.267,.066,.235],tileColors[(row+col)%tileColors.length],[.23,0,0]);
+  }
+  s.box([-.805,2.79,3.99],[2.27,.12,.1],'#80563c');
+  for(const x of [-1.66,.05]){
+    s.beam([x,2.3,3.07],[x,2.76,3.91],.043,timber,.043,5);
+    s.beam([x,2.32,3.07],[x,2.94,3.08],.048,timber,.048,5);
+  }
+  // A small lantern and rain pipe give the exterior some lived-in detail.
+  s.box([-1.98,2.24,3.13],[.18,.29,.17],'#e8c67c');
+  for(const y of [2.08,2.4])s.box([-1.98,y,3.13],[.25,.055,.24],'#74613f');
+  for(const x of [-2.073,-1.887])s.box([x,2.24,3.226],[.021,.31,.022],timber);
+  s.beam([4.02,3.12,1.58],[4.02,1.06,1.58],.043,'#777a61',.043,7);
+  s.beam([4.02,1.06,1.58],[3.96,.96,2.15],.043,'#777a61',.043,7);
   // Rain barrel, stacked firewood, bench and a potted olive-green shrub.
   s.add(new THREE.CylinderGeometry(.43,.38,.93,12), '#8b7851',[3.95,.47,2.2]);
   for(const y of [.18,.74])s.add(new THREE.TorusGeometry(.42,.025,4,12),'#635d4b',[3.95,y,2.2],[1,1,1],[Math.PI/2,0,0]);
@@ -163,6 +183,29 @@ export function makeCottage(scene, colliders) {
   s.add(new THREE.CylinderGeometry(.31,.23,.47,12),'#b67d59',[-2.47,.25,4.14]);
   for(let i=0;i<7;i++)s.ellipsoid([-2.47+(rng()-.5)*.38,.63+rng()*.23,4.14+(rng()-.5)*.38],[.22,.25,.2],'#7d9450',1);
   s.finish(group,'The meadow cottage');
+  const ivy=new Sculpture(paintedMaterial({leaf:true,side:THREE.DoubleSide}));
+  const ivyLeaf=new THREE.BufferGeometry();
+  ivyLeaf.setAttribute('position',new THREE.Float32BufferAttribute([
+    0,-.14,0, -.12,.02,0, -.085,.1,.008, 0,.058,.025, .085,.1,.008, .12,.02,0,
+  ],3));
+  ivyLeaf.setIndex([0,1,3,1,2,3,0,3,5,3,4,5]);
+  ivyLeaf.computeVertexNormals();
+  for(let vine=0;vine<5;vine++){
+    let previous=[-3.586,.2,-2.48+vine*.2];
+    for(let node=1;node<=13;node++){
+      const y=.18+node*.23, z=-2.58+vine*.28+Math.sin(node*.49+vine)*.23;
+      const p=[-3.595,y,z];
+      ivy.beam(previous,p,.008,'#798051',.006,3);
+      for(const side of [-1,1]){
+        const size=.76+rng()*.57;
+        ivy.add(ivyLeaf,['#507b4e','#638947','#8aa35d'][node%3],
+          [-3.62-rng()*.022,y+(rng()-.5)*.09,z+side*(.07+rng()*.16)],
+          [size,size,size],[0,-Math.PI/2,side*.55+(rng()-.5)*.3]);
+      }
+      previous=p;
+    }
+  }
+  ivy.finish(group,'Ivy climbing the cottage wall');
   colliders.push({type:'box',x:COTTAGE.x,z:COTTAGE.z,halfX:3.58,halfZ:3.08,angle:COTTAGE.rotation});
   const smoke=new THREE.Vector3(-1.65,6.4,-1.26).applyEuler(group.rotation).add(group.position);
   return { group, smoke };
@@ -170,11 +213,11 @@ export function makeCottage(scene, colliders) {
 
 export function makeStonesAndGarden(scene, colliders) {
   const rng=random(575);
-  const rocks=[], moss=[];
+  const rocks=[], moss=[], pebbles=[];
   for(let i=0;i<250;i++){
     const z=(rng()-.5)*153;
     const side=rng()>.5?1:-1;
-    const x=riverX(z)+side*(riverWidth(z)+.25+rng()*1.5);
+    const x=riverBankX(z,side)+side*(-.1+rng()*1.5);
     if(Math.abs(z-BRIDGE.z)<2.4)continue;
     const size=.22+rng()*.62;
     const y=terrainHeight(x,z)+.11;
@@ -191,6 +234,16 @@ export function makeStonesAndGarden(scene, colliders) {
   const geo=new THREE.IcosahedronGeometry(1,1);
   instances(scene,geo,paintedMaterial(),rocks,'Stream stones');
   instances(scene,new THREE.IcosahedronGeometry(1,1),paintedMaterial({leaf:true}),moss,'Soft moss on the stones');
+  // Small gravel patches soften the junction of water, wet soil and meadow.
+  for(let i=0;i<90;i++){
+    const z=(rng()-.5)*133,side=rng()>.5?1:-1,bank=riverBankX(z,side);
+    if(Math.abs(z-BRIDGE.z)<2.7)continue;
+    for(let j=0;j<7;j++){
+      const x=bank+side*(.05+rng()*.72),pz=z+(rng()-.5)*1.9,size=.045+rng()*.105;
+      pebbles.push({position:[x,terrainHeight(x,pz)+size*.19,pz],scale:[size*1.3,size*.46,size],rotation:[.08,rng()*TAU,.09],color:['#a8ab94','#bbc0a4','#829685','#c1b696'][j%4]});
+    }
+  }
+  instances(scene,new THREE.IcosahedronGeometry(1,0),paintedMaterial(),pebbles,'Shoreline gravel');
   const details=new Sculpture(paintedMaterial());
   // A fence frames the garden without fencing off exploration.
   const points=[[26,2],[31,4],[34,8],[35,12],[35,16],[34,20],[32,24]];
@@ -208,5 +261,8 @@ export function makeStonesAndGarden(scene, colliders) {
   details.box([bx,by+.56,bz],[2.4,.12,.58],'#a48c5f',[0,-.23,0]);
   details.box([bx,by+1.01,bz-.3],[2.42,.39,.085],'#ad9668',[0,-.23,-.02]);
   for(const x of [bx-.88,bx+.88])details.box([x,by+.31,bz],[.14,.61,.42],'#786542');
+  for(const [x,z,sx,sz] of [[15.55,-13.8,.72,.37],[15.34,-12.95,.62,.34],[14.8,-12.05,.66,.38],[14.22,-11.2,.58,.32]]){
+    details.ellipsoid([x,terrainHeight(x,z)+.025,z],[sx,.085,sz],'#b4af92',1);
+  }
   details.finish(scene,'Garden fence and the old tree bench');
 }

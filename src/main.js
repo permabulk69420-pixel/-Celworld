@@ -155,7 +155,7 @@ async function start(){
     frameCounter++;
     if(diagnostic&&frameCounter%30===0){
       diagnostic.textContent=[
-        'CELWORLD 0.1 · '+(renderer.xr.isPresenting?'VR':'PREVIEW'),
+        'CELWORLD 0.2 · '+(renderer.xr.isPresenting?'VR':'PREVIEW'),
         'draw calls: '+renderer.info.render.calls,
         'triangles: '+renderer.info.render.triangles.toLocaleString(),
         'grass blades: '+grass.count.toLocaleString(),

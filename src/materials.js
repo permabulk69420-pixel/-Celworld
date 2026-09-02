@@ -17,18 +17,19 @@ gl_FragColor.rgb = mix(gl_FragColor.rgb, uFogColor, mist * .94);
 #include <tonemapping_fragment>
 #include <colorspace_fragment>
 `;
-export function paintedMaterial({ color = '#ffffff', wind = 0, leaf = false, clouds = false, side = THREE.FrontSide } = {}) {
+export function paintedMaterial({ color = '#ffffff', wind = 0, leaf = false, clouds = false, rooted = false, side = THREE.FrontSide } = {}) {
   const mat = new THREE.ShaderMaterial({
     side,
     vertexColors: true,
     uniforms: {
       uColor: { value: new THREE.Color(color) }, uTime: time, uSun: { value: sun },
-      uWind: { value: wind }, uLeaf: { value: leaf ? 1 : 0 }, uCloud: { value: clouds ? 1 : 0 },
+      uWind: { value: wind }, uLeaf: { value: leaf ? 1 : 0 }, uCloud: { value: clouds ? 1 : 0 }, uRooted: { value: rooted ? 1 : 0 },
       uFogColor: { value: atmosphere.color }, uFogNear: { value: atmosphere.near }, uFogFar: { value: atmosphere.far },
     },
     vertexShader: `
       uniform float uTime;
       uniform float uWind;
+      uniform float uRooted;
       varying vec3 vWorld;
       varying vec3 vNormal;
       varying vec3 vColor;
@@ -50,8 +51,9 @@ export function paintedMaterial({ color = '#ffffff', wind = 0, leaf = false, clo
         #endif
         vec4 wp = modelMatrix * vec4(p, 1.);
         float gust = sin(wp.x * .16 + wp.z * .12 - uTime * 1.3);
-        wp.x += uWind * (.55 * gust + .23 * sin(wp.z * .44 + uTime * 2.1));
-        wp.z += uWind * .26 * gust;
+        float bend = mix(1., clamp(position.y * position.y, 0., 1.), uRooted);
+        wp.x += uWind * bend * (.55 * gust + .23 * sin(wp.z * .44 + uTime * 2.1));
+        wp.z += uWind * bend * .26 * gust;
         vWorld = wp.xyz;
         vNormal = normalize(mat3(modelMatrix) * n);
         gl_Position = projectionMatrix * viewMatrix * wp;
@@ -143,10 +145,11 @@ export function waterMaterial() {
   return new THREE.ShaderMaterial({
     uniforms: { uTime: time, uFogColor: { value: atmosphere.color }, uFogNear: { value: atmosphere.near }, uFogFar: { value: atmosphere.far } },
     vertexShader: `
+      attribute float waterDepth;
       varying vec3 vWorld;
-      varying vec2 vUv;
+      varying float vDepth;
       void main() {
-        vUv = uv;
+        vDepth = waterDepth;
         vWorld = (modelMatrix * vec4(position, 1.)).xyz;
         gl_Position = projectionMatrix * viewMatrix * vec4(vWorld, 1.);
       }
@@ -154,22 +157,30 @@ export function waterMaterial() {
     fragmentShader: `
       uniform float uTime;
       varying vec3 vWorld;
-      varying vec2 vUv;
+      varying float vDepth;
       ${fogPars}
       void main() {
-        float edge = abs(vUv.x * 2. - 1.);
-        float flow = sin(vWorld.z * 5.4 + uTime * 2.3 + sin(vWorld.x * 4.5 + uTime) * 1.8);
-        float ripple = sin(vWorld.x * 8. + vWorld.z * 2.8 - uTime * 2.) * .5 + .5;
-        float longWave = sin(vWorld.z * 1.1 - vWorld.x * .7 + uTime * .45);
-        vec3 col = mix(vec3(.08, .40, .43), vec3(.23, .61, .59), .5 + longWave * .15);
-        col = mix(col, vec3(.38, .64, .53), smoothstep(.65, 1., edge));
-        float foam = smoothstep(.87, .96, edge + .016 * flow);
-        float streak = smoothstep(.957, .998, flow) * smoothstep(.35, .9, ripple);
+        float flow = sin(vWorld.z * 4.1 + uTime * 1.8 + sin(vWorld.x * 3.3 + uTime * .5) * 1.7);
+        float ripple = sin(vWorld.x * 6.2 + vWorld.z * 2.8 - uTime * 1.6) * .5 + .5;
+        float longWave = sin(vWorld.z * .72 - vWorld.x * .55 + uTime * .35);
+        float deep = smoothstep(.015, .5, vDepth);
+        vec3 col = mix(vec3(.26, .46, .34), vec3(.075, .38, .41), deep);
+        col += longWave * vec3(.018, .034, .028);
+        // Quiet, broad reflection shapes and tiny flowing highlights, without a
+        // reflection pass or transparent layers on the headset.
+        float reflection = smoothstep(.18, .78, sin(vWorld.x * .38 + longWave * .45) * sin(vWorld.z * .19));
+        col = mix(col, vec3(.19, .43, .33), reflection * .21 * deep);
         vec3 view = normalize(cameraPosition - vWorld);
         float fresnel = pow(1. - max(0., view.y), 3.);
-        col = mix(col, vec3(.55, .77, .74), fresnel * .6);
-        col += streak * vec3(.25, .35, .3) * (1. - foam);
-        col = mix(col, vec3(.79, .86, .69), foam * .7);
+        col = mix(col, vec3(.51, .73, .69), fresnel * .55);
+        float aa = max(fwidth(flow), .008);
+        float streak = smoothstep(.95 - aa, 1., flow) * smoothstep(.5, .94, ripple);
+        col += streak * vec3(.2, .29, .25) * smoothstep(.04, .2, vDepth);
+        float lace = .45 + .35 * sin(vWorld.z * 2.1 + sin(vWorld.x * 3.) + uTime * .65);
+        float foam = (1. - smoothstep(.008, .055, vDepth)) * lace;
+        col = mix(col, vec3(.72, .80, .65), foam * .72);
+        float caustic = smoothstep(.84, .97, ripple * (.5 + .5 * longWave));
+        col += caustic * (1. - deep) * vec3(.035, .048, .014);
         gl_FragColor = vec4(col, 1.);
         ${fogApply}
       }

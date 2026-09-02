@@ -3,6 +3,7 @@ import { makeTerrain, makeHills } from './terrain.js';
 import { treeLayout, makeTrees, makeGrass, makeFlowers } from './vegetation.js';
 import { makeCottage, makeBridge, makeStonesAndGarden } from './props.js';
 import { makeSky, makeLife } from './atmosphere.js';
+import { makeUndergrowth } from './undergrowth.js';
 
 export function createWorld() {
   const scene=new THREE.Scene();
@@ -14,6 +15,7 @@ export function createWorld() {
   const flowerCount=makeFlowers(scene);
   const cottage=makeCottage(scene,colliders);
   makeBridge(scene,colliders);makeStonesAndGarden(scene,colliders);
+  const undergrowth=makeUndergrowth(scene,trees);
   const animateLife=makeLife(scene,cottage.smoke);
-  return {scene,colliders,grass,flowerCount,animateLife};
+  return {scene,colliders,grass,flowerCount:flowerCount+undergrowth.lupines,undergrowth,animateLife};
 }

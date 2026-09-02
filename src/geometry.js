@@ -60,3 +60,17 @@ export function instances(parent, geometry, material, entries, name) {
   parent.add(mesh);
   return mesh;
 }
+
+export function spatialInstances(parent, geometry, material, entries, name, cellSize = 32) {
+  const groups = new Map();
+  for (const entry of entries) {
+    const key = Math.floor(entry.position[0] / cellSize) + ',' + Math.floor(entry.position[2] / cellSize);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(entry);
+  }
+  return [...groups].map(([key, batch]) => {
+    const mesh = instances(parent, geometry, material, batch, name + ' ' + key);
+    mesh.boundingSphere.radius += .1;
+    return mesh;
+  });
+}

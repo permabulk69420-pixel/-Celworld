@@ -1,17 +1,16 @@
 import * as THREE from 'three';
-import { terrainHeight, pathDistance, riverX, riverWidth, riverDistance, WATER_Y } from './land.js';
-import { fbm, noise, random, lerp, smoothstep, TAU } from './math.js';
+import { terrainHeight, pathDistance, WATER_Y, TERRAIN_SIZE } from './land.js';
+import { fbm, noise, lerp, smoothstep, TAU } from './math.js';
 import { paintedMaterial, waterMaterial } from './materials.js';
-import { instances } from './geometry.js';
 
 export function makeTerrain(scene, trees) {
-  const geometry = new THREE.PlaneGeometry(212, 212, 212, 212);
+  const geometry = new THREE.PlaneGeometry(TERRAIN_SIZE, TERRAIN_SIZE, TERRAIN_SIZE, TERRAIN_SIZE);
   geometry.rotateX(-Math.PI / 2);
   const position = geometry.attributes.position;
   const colors = new Float32Array(position.count * 3);
   const green = new THREE.Color('#819f4e'), light = new THREE.Color('#b0b966');
   const dark = new THREE.Color('#56845b'), earth = new THREE.Color('#c2ae7e');
-  const bank = new THREE.Color('#93a76d');
+  const bank = new THREE.Color('#9da47b'), wetEarth = new THREE.Color('#657d62');
   const c = new THREE.Color();
   for (let i = 0; i < position.count; i++) {
     const x = position.getX(i), z = position.getZ(i), h = terrainHeight(x, z);
@@ -19,15 +18,17 @@ export function makeTerrain(scene, trees) {
     const patch = fbm(x * .073 + 40, z * .073 + 20);
     c.copy(green).lerp(patch > .48 ? light : dark, Math.abs(patch - .48) * 2.7);
     c.multiplyScalar(.96 + .09 * noise(x * .7, z * .7));
-    const rd = riverDistance(x, z) - riverWidth(z);
-    c.lerp(bank, (1 - smoothstep(0, 1.5, Math.abs(rd))) * .62);
+    const bankTone = 1 - smoothstep(WATER_Y + .12, WATER_Y + .7, h);
+    c.lerp(bank, bankTone * .85);
+    c.lerp(wetEarth, 1 - smoothstep(WATER_Y - .08, WATER_Y + .12, h));
     const pd = pathDistance(x, z) + (noise(x * 1.8, z * 1.8) - .5) * .38;
-    c.lerp(earth, 1 - smoothstep(.72, 1.52, pd));
-    if (rd < 0) c.lerp(earth, .55);
+    c.lerp(earth, (1 - smoothstep(.72, 1.52, pd)) * smoothstep(WATER_Y + .06, WATER_Y + .3, h));
     let shadow = 0;
     for (const t of trees) {
       const d = Math.hypot((x - t.x - t.s * 1.8) / (t.s * 3.9), (z - t.z + t.s * 1.4) / (t.s * 3.2));
-      shadow = Math.max(shadow, (1 - smoothstep(.25, 1.2, d)) * .33);
+      const canopyShade = 1 - smoothstep(.25, 1.2, d);
+      const dapples = noise(x * 1.25 + 8, z * 1.25 - 12);
+      shadow = Math.max(shadow, canopyShade * (.24 + .2 * smoothstep(.32, .72, dapples)));
     }
     const houseShade = Math.max(Math.abs(x - 18.7) / 5.4, Math.abs(z + 21.2) / 4.6);
     shadow = Math.max(shadow, (1 - smoothstep(.82,1.17,houseShade)) * .29);
@@ -40,35 +41,48 @@ export function makeTerrain(scene, trees) {
   mesh.name = 'Rolling meadow and winding paths';
   scene.add(mesh);
 
-  const riverPositions = [], riverUV = [], indices = [];
-  for (let i = 0; i <= 360; i++) {
-    const z = -108 + i * .6;
-    const x = riverX(z);
-    const banks = [-1,1].map(side => {
-      let low = riverWidth(z) * .4, high = riverWidth(z) + 7;
-      for (let n = 0; n < 12; n++) {
-        const d = (low + high) * .5;
-        if (terrainHeight(x + side * d, z) < WATER_Y + .07) low = d; else high = d;
-      }
-      return x + side * (high + .15);
-    });
-    riverPositions.push(banks[0], WATER_Y, z, banks[1], WATER_Y, z);
-    riverUV.push(0, i / 12, 1, i / 12);
-    if (i < 360) { const a = i * 2; indices.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
-  }
-  const riverGeometry = new THREE.BufferGeometry();
-  riverGeometry.setAttribute('position', new THREE.Float32BufferAttribute(riverPositions, 3));
-  riverGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(riverUV, 2));
-  riverGeometry.setIndex(indices);
-  riverGeometry.computeVertexNormals();
-  const water = new THREE.Mesh(riverGeometry, waterMaterial());
+  const water = new THREE.Mesh(makeWaterGeometry(geometry), waterMaterial());
   water.name = 'The winding stream';
   scene.add(water);
   return mesh;
 }
 
+export function makeWaterGeometry(ground) {
+  const position = ground.attributes.position, index = ground.index.array;
+  const vertices = [], depths = [];
+  const point = i => [position.getX(i), position.getY(i), position.getZ(i)];
+  const emit = p => {
+    vertices.push(p[0], WATER_Y, p[2]);
+    depths.push(Math.max(0, WATER_Y - p[1]));
+  };
+  // Clip the wet part of each triangle to the water plane. Shared edges meet at
+  // exactly the same ground intersection, even on the formerly flooded bend.
+  for (let i = 0; i < index.length; i += 3) {
+    const a = index[i], b = index[i + 1], c = index[i + 2];
+    if (position.getY(a) >= WATER_Y && position.getY(b) >= WATER_Y && position.getY(c) >= WATER_Y) continue;
+    const triangle = [point(a), point(b), point(c)], wet = [];
+    for (let j = 0; j < 3; j++) {
+      const p = triangle[j], q = triangle[(j + 1) % 3];
+      const pWet = p[1] < WATER_Y, qWet = q[1] < WATER_Y;
+      if (pWet) wet.push(p);
+      if (pWet !== qWet) {
+        const t = (WATER_Y - p[1]) / (q[1] - p[1]);
+        wet.push([lerp(p[0], q[0], t), WATER_Y, lerp(p[2], q[2], t)]);
+      }
+    }
+    for (let j = 1; j < wet.length - 1; j++) {
+      emit(wet[0]); emit(wet[j]); emit(wet[j + 1]);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setAttribute('waterDepth', new THREE.Float32BufferAttribute(depths, 1));
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
 export function makeHills(scene) {
-  const rng = random(831);
   const palette = ['#a7c0c5', '#89acae', '#73998b'];
   for (let layer = 0; layer < 3; layer++) {
     const radius = 335 - layer * 77;

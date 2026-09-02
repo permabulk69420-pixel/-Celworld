@@ -28,7 +28,7 @@ export function makeTrees(scene, trees, colliders) {
   const rng = random(9012);
   const trunks = new Sculpture(paintedMaterial());
   const lobes = [], edgeLeaves = [];
-  const palette = ['#6e8d45', '#789447', '#819e4b', '#8aa34f', '#739148', '#99ac57'];
+  const palette = ['#587e48', '#6d8e48', '#819e50', '#91ab59', '#74934b', '#a2b76a'];
   const canopy = new THREE.IcosahedronGeometry(1, 2);
   const p = canopy.attributes.position;
   for (let i = 0; i < p.count; i++) {
@@ -51,7 +51,7 @@ export function makeTrees(scene, trees, colliders) {
       trunks.beam([x + Math.cos(a) * 1.15 * s, y + .06, z + Math.sin(a) * 1.15 * s], [x, y + .9 * s, z], .08 * s, '#76643d', .25 * s);
     }
     for (let b = 0; b < 5; b++) {
-      const a = b / 5 * TAU + .38;
+      const a = b / 5 * TAU + .38 + (rng() - .5) * .4;
       const end = [x + Math.cos(a) * 2.2 * s, y + (4.5 + rng() * .9) * s, z + Math.sin(a) * 2.2 * s];
       trunks.beam([x + lean * .5, y + (2.8 + rng()) * s, z], end, .21 * s, '#76613b', .075 * s);
       trunks.beam(end, [end[0] + Math.cos(a) * s, end[1] + .65 * s, end[2] + Math.sin(a) * s], .07 * s, '#827044', .025 * s);
@@ -60,12 +60,12 @@ export function makeTrees(scene, trees, colliders) {
     for (let k = 0; k < 17; k++) {
       const a = k * 2.39996;
       const outer = Math.sqrt(k / 16);
-      const r = outer * 3.25 * s;
+      const r = outer * (3.05 + rng() * .55) * s;
       const lx = x + lean + Math.cos(a) * r;
       const lz = z + Math.sin(a) * r * .84;
-      const ly = y + (6.35 - outer * 1.05 + rng() * .6) * s;
+      const ly = y + (6.35 - outer * 1.1 + rng() * .8) * s;
       const size = (1.25 + rng() * .64) * s;
-      const color = palette[Math.floor(rng() * palette.length)];
+      const color = palette[Math.floor(rng() * (outer > .78 ? 4 : palette.length))];
       lobes.push({ position: [lx, ly, lz], scale: [size * 1.28, size * .79, size], rotation: [rng() * .35, rng() * TAU, .15], color });
       for (let j = 0; j < 15; j++) {
         const az = rng() * TAU, elev = (rng() - .5) * 2.35;
@@ -115,7 +115,12 @@ export function makeGrass(scene, trees) {
       c.copy(base).lerp(light, field * .75 + rng() * .2);
       c.multiplyScalar(.83 + rng() * .25);
       for (const tree of trees) {
-        if (Math.hypot(x - tree.x, z - tree.z) < tree.s * 3.5) { c.multiplyScalar(.8); break; }
+        const d = Math.hypot((x - tree.x - tree.s * 1.8) / (tree.s * 3.9), (z - tree.z + tree.s * 1.4) / (tree.s * 3.2));
+        if (d < 1.2) {
+          const dapples = noise(x * 1.25 + 8, z * 1.25 - 12);
+          c.multiplyScalar(1 - (1 - smoothstep(.25, 1.2, d)) * (.24 + .2 * smoothstep(.32, .72, dapples)));
+          break;
+        }
       }
       tints.push(c.r, c.g, c.b);
     }
@@ -168,6 +173,6 @@ export function makeFlowers(scene) {
     const scale = .65 + rng() * .7;
     groups[kind].push({position:[x,terrainHeight(x,z),z],scale:[scale,scale,scale],rotation:[(rng()-.5)*.18,rng()*TAU,(rng()-.5)*.25]});
   }
-  ['#f8f0cc','#eec363','#dd947c'].forEach((color,i) => instances(scene,flowerGeometry(color,i===2?5:7),paintedMaterial({wind:.025,side:THREE.DoubleSide}),groups[i],'Wildflowers '+i));
+  ['#f8f0cc','#eec363','#dd947c'].forEach((color,i) => instances(scene,flowerGeometry(color,i===2?5:7),paintedMaterial({wind:.025,rooted:true,side:THREE.DoubleSide}),groups[i],'Wildflowers '+i));
   return groups.reduce((sum,g)=>sum+g.length,0);
 }
